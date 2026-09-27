@@ -135,3 +135,33 @@ export async function updateAssetLabel(assetId: string, label: string): Promise<
   await db.mediaAsset.update({ where: { id: assetId }, data: { label } });
   return { ok: true };
 }
+
+/**
+ * Update a model asset's orientation correction (degrees). Applied generically
+ * by the 3D viewer so a flipped/rotated model can be corrected from admin.
+ */
+export async function updateAssetRotation(
+  assetId: string,
+  rotation: { x?: number; y?: number; z?: number },
+): Promise<UploadResult> {
+  await requireUser();
+  const asset = await db.mediaAsset.findUnique({ where: { id: assetId } });
+  if (!asset) return { ok: false, error: "Asset not found" };
+
+  await db.mediaAsset.update({
+    where: { id: assetId },
+    data: {
+      rotationX: rotation.x ?? asset.rotationX,
+      rotationY: rotation.y ?? asset.rotationY,
+      rotationZ: rotation.z ?? asset.rotationZ,
+    },
+  });
+
+  if (asset.projectId) {
+    revalidatePath(`/admin/projects/${asset.projectId}`);
+    const proj = await db.project.findUnique({ where: { id: asset.projectId } });
+    if (proj) revalidatePath(`/projects/${proj.slug}`);
+  }
+  revalidatePath("/");
+  return { ok: true };
+}

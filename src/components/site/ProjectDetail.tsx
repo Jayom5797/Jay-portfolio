@@ -1,8 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Badge } from "@/components/ui/Badge";
 import { Gallery } from "@/components/site/Gallery";
 import { ProjectModels } from "@/components/site/ProjectModels";
+import { DrawingViewer } from "@/components/site/DrawingViewer";
 import { technicalFields } from "@/lib/mappers";
 import { formatBytes } from "@/lib/utils";
 import type { ProjectDTO } from "@/lib/types";
@@ -133,34 +133,8 @@ export function ProjectDetail({ project }: { project: ProjectDTO }) {
       {hasDrawings && (
         <section className="mt-16 border-t border-steel-800 pt-12">
           <span className="tech-label text-accent-bright">Technical Drawings</span>
-          <div className="mt-8 grid grid-cols-1 gap-3 md:grid-cols-2">
-            {project.drawings.map((d) =>
-              d.mimeType.includes("pdf") ? (
-                <a
-                  key={d.id}
-                  href={d.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-between border border-steel-800 bg-ink-900 px-5 py-4 hover:border-steel-600"
-                >
-                  <span className="text-sm text-steel-200">{d.label || "Drawing (PDF)"}</span>
-                  <span className="tech-label text-accent-bright">Open →</span>
-                </a>
-              ) : (
-                <div
-                  key={d.id}
-                  className="relative aspect-[4/3] overflow-hidden border border-steel-800 bg-white"
-                >
-                  <Image
-                    src={d.url}
-                    alt={d.label || "Technical drawing"}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    className="object-contain"
-                  />
-                </div>
-              ),
-            )}
+          <div className="mt-8">
+            <DrawingViewer drawings={project.drawings} />
           </div>
         </section>
       )}

@@ -24,7 +24,15 @@ interface Explodable {
  * without per-model configuration. Parts are the meaningful child objects of
  * the scene (or, if the scene is a single wrapper, that wrapper's children).
  */
-function Model({ url, explode }: { url: string; explode: number }) {
+function Model({
+  url,
+  explode,
+  rotation,
+}: {
+  url: string;
+  explode: number;
+  rotation: [number, number, number];
+}) {
   const { scene } = useGLTF(url);
   // Clone so the same cached GLTF can be shown in multiple viewers safely.
   const cloned = useMemo(() => scene.clone(true), [scene]);
@@ -77,7 +85,14 @@ function Model({ url, explode }: { url: string; explode: number }) {
     }
   }, [parts, explode, spread]);
 
-  return <primitive object={cloned} />;
+  // Orientation correction is applied on a wrapper group (in radians) so it
+  // composes cleanly with Bounds' auto-fit around the corrected model.
+  const rad = (d: number) => (d * Math.PI) / 180;
+  return (
+    <group rotation={[rad(rotation[0]), rad(rotation[1]), rad(rotation[2])]}>
+      <primitive object={cloned} />
+    </group>
+  );
 }
 
 /** Refits the camera to the model bounds whenever the model changes. */
@@ -95,12 +110,15 @@ export default function ModelScene({
   url,
   resetSignal,
   explode = 0,
+  rotation = [0, 0, 0],
 }: {
   url: string;
   /** Increment to trigger a camera reset from the parent controls. */
   resetSignal: number;
   /** 0 = assembled, 1 = fully separated (exploded view). */
   explode?: number;
+  /** Orientation correction in degrees [x, y, z]. */
+  rotation?: [number, number, number];
 }) {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const [fitKey, setFitKey] = useState(0);
@@ -129,8 +147,8 @@ export default function ModelScene({
           which avoids drei <Html> mount/unmount races under React 19. */}
       <Suspense fallback={null}>
         <Bounds fit clip observe margin={1.2}>
-          <AutoFit trigger={`${url}-${fitKey}`}>
-            <Model url={url} explode={explode} />
+          <AutoFit trigger={`${url}-${fitKey}-${rotation.join(",")}`}>
+            <Model url={url} explode={explode} rotation={rotation} />
           </AutoFit>
         </Bounds>
         <Environment preset="studio" />

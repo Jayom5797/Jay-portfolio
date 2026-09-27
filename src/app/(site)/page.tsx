@@ -62,6 +62,7 @@ export default async function HomePage() {
                   url={heroModel.url}
                   autoLoad
                   allowExplode={false}
+                  rotation={[heroModel.rotationX, heroModel.rotationY, heroModel.rotationZ]}
                   className="aspect-square"
                 />
                 <div className="mt-3 flex items-center justify-between">

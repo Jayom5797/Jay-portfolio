@@ -12,6 +12,10 @@ export interface Asset {
   mimeType: string;
   sizeBytes: number;
   order: number;
+  /** Orientation correction in degrees (models only). */
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
 }
 
 export interface CaseStudySection {

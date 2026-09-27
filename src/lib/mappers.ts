@@ -26,6 +26,9 @@ export function mapAsset(a: MediaAsset): Asset {
     mimeType: a.mimeType,
     sizeBytes: a.sizeBytes,
     order: a.order,
+    rotationX: a.rotationX,
+    rotationY: a.rotationY,
+    rotationZ: a.rotationZ,
   };
 }
 

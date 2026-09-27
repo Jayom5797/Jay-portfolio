@@ -101,11 +101,14 @@ export function ModelViewer({
   autoLoad = true,
   /** Show the split / exploded-view slider. */
   allowExplode = true,
+  /** Orientation correction in degrees [x, y, z]. */
+  rotation = [0, 0, 0],
 }: {
   url: string;
   className?: string;
   autoLoad?: boolean;
   allowExplode?: boolean;
+  rotation?: [number, number, number];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(autoLoad);
@@ -151,7 +154,12 @@ export function ModelViewer({
       ) : (
         <ViewerErrorBoundary onError={() => setErrored(true)}>
           <Suspense fallback={<ViewerSkeleton />}>
-            <ModelScene url={url} resetSignal={resetSignal} explode={explode} />
+            <ModelScene
+              url={url}
+              resetSignal={resetSignal}
+              explode={explode}
+              rotation={rotation}
+            />
           </Suspense>
           <LoadingOverlay />
         </ViewerErrorBoundary>

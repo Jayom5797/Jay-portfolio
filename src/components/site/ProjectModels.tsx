@@ -32,7 +32,12 @@ export function ProjectModels({ models }: { models: Asset[] }) {
   return (
     <div>
       {/* Autoload the primary model — it's the central feature of the page. */}
-      <ModelViewer key={active.id} url={active.url} autoLoad />
+      <ModelViewer
+        key={active.id}
+        url={active.url}
+        autoLoad
+        rotation={[active.rotationX, active.rotationY, active.rotationZ]}
+      />
 
       {models.length > 1 && (
         <div className="mt-3 flex flex-wrap gap-2">

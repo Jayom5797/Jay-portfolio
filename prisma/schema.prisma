@@ -172,6 +172,13 @@ model MediaAsset {
 
   order     Int       @default(0)
 
+  // Model orientation correction (degrees). Applied generically by the 3D
+  // viewer so a model authored in a flipped/rotated frame can be corrected
+  // from the admin panel — no per-project code.
+  rotationX Float @default(0)
+  rotationY Float @default(0)
+  rotationZ Float @default(0)
+
   // Owning project (nullable so an asset can exist briefly before attach).
   projectId String?
   project   Project?  @relation("ProjectAssets", fields: [projectId], references: [id], onDelete: Cascade)

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { uploadAsset, deleteAsset } from "@/lib/actions/assets";
+import { uploadAsset, deleteAsset, updateAssetRotation } from "@/lib/actions/assets";
 import { formatBytes } from "@/lib/utils";
 import type { Asset } from "@/lib/types";
 import type { AssetKind } from "@prisma/client";
@@ -207,10 +207,86 @@ function AssetSlot({
                   Delete
                 </button>
               </div>
+
+              {a.kind.startsWith("MODEL_") && <RotationControls asset={a} />}
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Orientation controls for a model asset — flip/rotate to fix bad exports. */
+function RotationControls({ asset }: { asset: Asset }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [rot, setRot] = useState({
+    x: asset.rotationX,
+    y: asset.rotationY,
+    z: asset.rotationZ,
+  });
+
+  const save = (next: { x: number; y: number; z: number }) => {
+    setRot(next);
+    startTransition(async () => {
+      await updateAssetRotation(asset.id, next);
+      router.refresh();
+    });
+  };
+
+  const step = (axis: "x" | "y" | "z", delta: number) =>
+    save({ ...rot, [axis]: (((rot[axis] + delta) % 360) + 360) % 360 });
+
+  const reset = () => save({ x: 0, y: 0, z: 0 });
+
+  return (
+    <div className="border-t border-steel-800 px-3 py-2">
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="tech-label text-[9px]">Orientation</span>
+        <button
+          type="button"
+          onClick={() => step("x", 180)}
+          disabled={pending}
+          className="font-mono text-[9px] uppercase tracking-label text-accent-bright hover:text-paper"
+        >
+          Flip upright (X 180°)
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        {(["x", "y", "z"] as const).map((axis) => (
+          <div key={axis} className="flex items-center gap-1">
+            <span className="font-mono text-[9px] uppercase text-steel-500">{axis}</span>
+            <button
+              type="button"
+              onClick={() => step(axis, -90)}
+              disabled={pending}
+              className="border border-steel-700 px-1.5 font-mono text-[10px] text-steel-300 hover:text-paper"
+            >
+              −
+            </button>
+            <span className="w-8 text-center font-mono text-[10px] text-steel-400">
+              {Math.round(rot[axis])}°
+            </span>
+            <button
+              type="button"
+              onClick={() => step(axis, 90)}
+              disabled={pending}
+              className="border border-steel-700 px-1.5 font-mono text-[10px] text-steel-300 hover:text-paper"
+            >
+              +
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={reset}
+          disabled={pending}
+          className="ml-auto font-mono text-[9px] uppercase tracking-label text-steel-500 hover:text-paper"
+        >
+          Reset
+        </button>
+      </div>
     </div>
   );
 }
