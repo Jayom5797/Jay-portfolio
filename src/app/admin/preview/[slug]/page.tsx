@@ -4,6 +4,7 @@ import { ProjectDetail } from "@/components/site/ProjectDetail";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { getProjectBySlugAnyStatus } from "@/lib/queries";
 import { requireUser } from "@/lib/auth";
+import { getProfile } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,10 @@ export default async function PreviewPage({
 }) {
   await requireUser();
   const { slug } = await params;
-  const project = await getProjectBySlugAnyStatus(slug);
+  const [project, profile] = await Promise.all([
+    getProjectBySlugAnyStatus(slug),
+    getProfile(),
+  ]);
   if (!project) notFound();
 
   return (
@@ -38,7 +42,7 @@ export default async function PreviewPage({
       </div>
 
       <ProjectDetail project={project} />
-      <SiteFooter />
+      <SiteFooter profile={profile} />
     </div>
   );
 }

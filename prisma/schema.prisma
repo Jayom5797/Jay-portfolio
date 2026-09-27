@@ -31,6 +31,32 @@ model User {
   updatedAt    DateTime @updatedAt
 }
 
+// ─── Site settings ────────────────────────────────────────────────────────
+// A single-row table (id = "singleton") holding editable site-wide content:
+// profile images, résumé, and contact details. Managed from the admin panel
+// so Jay can change them without touching env vars or code. Empty fields fall
+// back to NEXT_PUBLIC_* env values at read time.
+model SiteSettings {
+  id String @id @default("singleton")
+
+  profileName  String @default("")
+  profileTitle String @default("")
+
+  // Public asset URLs (served from object storage).
+  profileImageUrl    String @default("")
+  profileImage2Url   String @default("")
+  fullBodyImageUrl   String @default("")
+  resumeUrl          String @default("")
+
+  // Contact
+  contactEmail String  @default("")
+  contactPhone String  @default("")
+  linkedinUrl  String  @default("")
+  showPhone    Boolean @default(true)
+
+  updatedAt DateTime @updatedAt @default(now())
+}
+
 // ─── Categories ─────────────────────────────────────────────────────────
 // Managed through the admin system, never permanently hardcoded.
 model Category {

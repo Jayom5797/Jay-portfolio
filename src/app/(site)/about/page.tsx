@@ -1,53 +1,37 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { profile } from "@/lib/profile";
+import { getProfile } from "@/lib/settings";
 import { ButtonLink } from "@/components/ui/Button";
+import { ProfilePortrait } from "@/components/site/ProfilePortrait";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "About",
   description: "About Jay — mechanical design and CAD engineer.",
 };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const profile = await getProfile();
+  const headshots = [profile.imageUrl, profile.image2Url].filter(Boolean);
+
   return (
     <div className="content-wrap py-16 md:py-24">
-      <div className="grid gap-12 md:grid-cols-[280px_1fr] md:gap-16">
-        {/* Profile image */}
+      <div className="grid gap-12 md:grid-cols-[300px_1fr] md:gap-16">
+        {/* Profile portrait (cross-fades headshots if two are set) */}
         <div className="md:sticky md:top-24 md:self-start">
-          {profile.imageUrl ? (
-            <div className="relative aspect-[4/5] w-full overflow-hidden border border-steel-800 bg-ink-900">
-              <Image
-                src={profile.imageUrl}
-                alt={profile.name}
-                fill
-                sizes="(max-width: 768px) 100vw, 280px"
-                className="object-cover"
-                priority
-              />
-            </div>
-          ) : (
-            <div className="blueprint-grid grid aspect-[4/5] w-full place-items-center border border-steel-800">
-              <span className="tech-label">Profile photo</span>
+          <ProfilePortrait images={headshots} alt={profile.name} />
+
+          {profile.resumeUrl && (
+            <div className="mt-5 flex gap-2">
+              <ButtonLink href={profile.resumeUrl} size="sm" target="_blank" rel="noreferrer">
+                View résumé
+              </ButtonLink>
+              <ButtonLink href={profile.resumeUrl} size="sm" variant="secondary" download>
+                Download
+              </ButtonLink>
             </div>
           )}
-
-          <div className="mt-5 space-y-3">
-            {profile.resumeUrl && (
-              <div className="flex gap-2">
-                <ButtonLink href={profile.resumeUrl} size="sm" target="_blank" rel="noreferrer">
-                  View résumé
-                </ButtonLink>
-                <ButtonLink
-                  href={profile.resumeUrl}
-                  size="sm"
-                  variant="secondary"
-                  download
-                >
-                  Download
-                </ButtonLink>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Bio */}
@@ -92,6 +76,22 @@ export default function AboutPage() {
               </ul>
             </div>
           </div>
+
+          {/* Full-body photo — a tall editorial portrait if provided */}
+          {profile.fullBodyImageUrl && (
+            <div className="mt-12 border-t border-steel-800 pt-10">
+              <span className="tech-label text-accent-bright">In the workshop</span>
+              <div className="relative mt-4 aspect-[3/4] w-full max-w-sm overflow-hidden border border-steel-800 bg-ink-900">
+                <Image
+                  src={profile.fullBodyImageUrl}
+                  alt={profile.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 384px"
+                  className="object-cover"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Résumé inline viewer */}
           {profile.resumeUrl && (

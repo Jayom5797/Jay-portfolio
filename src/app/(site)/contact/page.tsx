@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
-import { profile } from "@/lib/profile";
+import { getProfile } from "@/lib/settings";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Contact",
   description: "Get in touch with Jay about mechanical design and CAD projects.",
 };
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const profile = await getProfile();
+
   const rows: { label: string; value: string; href?: string }[] = [];
   if (profile.email)
     rows.push({ label: "Email", value: profile.email, href: `mailto:${profile.email}` });

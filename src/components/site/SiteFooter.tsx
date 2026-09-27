@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { profile } from "@/lib/profile";
+import type { ResolvedProfile } from "@/lib/settings";
 
-export function SiteFooter() {
+export function SiteFooter({ profile }: { profile: ResolvedProfile }) {
   const year = new Date().getFullYear();
 
   const contacts: { label: string; href: string; external?: boolean }[] = [];

@@ -1,11 +1,14 @@
 import { AdminHeader } from "@/components/admin/AdminHeader";
+import { ProfileSettings } from "@/components/admin/ProfileSettings";
 import { getSessionUser } from "@/lib/auth";
+import { getSiteSettings } from "@/lib/settings";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminSettingsPage() {
   const user = await getSessionUser();
+  const settings = await getSiteSettings();
 
   const rows: { label: string; value: string }[] = [
     { label: "Signed in as", value: user?.name ?? "—" },
@@ -17,9 +20,11 @@ export default async function AdminSettingsPage() {
 
   return (
     <div>
-      <AdminHeader title="Settings" description="Account and system configuration" />
+      <AdminHeader title="Settings" description="Profile, contact, résumé and system configuration" />
 
-      <div className="max-w-2xl space-y-10 p-8">
+      <div className="max-w-3xl space-y-10 p-8">
+        <ProfileSettings settings={settings} />
+
         <section>
           <h2 className="tech-label text-accent-bright">System</h2>
           <div className="mt-4 border border-steel-800">
