@@ -5,11 +5,9 @@ import { Canvas } from "@react-three/fiber";
 import {
   Bounds,
   Environment,
-  Html,
   OrbitControls,
   useBounds,
   useGLTF,
-  useProgress,
 } from "@react-three/drei";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -93,26 +91,6 @@ function AutoFit({ children, trigger }: { children: React.ReactNode; trigger: un
   return <>{children}</>;
 }
 
-function Loader() {
-  const { progress, active } = useProgress();
-  if (!active && progress >= 100) return null;
-  return (
-    <Html center>
-      <div className="flex w-48 flex-col items-center gap-3">
-        <div className="h-px w-full bg-steel-700">
-          <div
-            className="h-px bg-accent-bright transition-all duration-200"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <span className="font-mono text-[11px] uppercase tracking-label text-steel-300">
-          Loading model · {Math.round(progress)}%
-        </span>
-      </div>
-    </Html>
-  );
-}
-
 export default function ModelScene({
   url,
   resetSignal,
@@ -147,7 +125,9 @@ export default function ModelScene({
       <directionalLight position={[5, 8, 5]} intensity={1.1} castShadow />
       <directionalLight position={[-5, 3, -5]} intensity={0.4} />
 
-      <Suspense fallback={<Loader />}>
+      {/* Fallback is null — the loading UI is a DOM overlay in ModelViewer,
+          which avoids drei <Html> mount/unmount races under React 19. */}
+      <Suspense fallback={null}>
         <Bounds fit clip observe margin={1.2}>
           <AutoFit trigger={`${url}-${fitKey}`}>
             <Model url={url} explode={explode} />

@@ -10,10 +10,36 @@ import {
   useRef,
   useState,
 } from "react";
+import { useProgress } from "@react-three/drei";
 import { cn } from "@/lib/utils";
 
 // The R3F/three bundle is only fetched when the viewer actually mounts.
 const ModelScene = lazy(() => import("./ModelScene"));
+
+/**
+ * Loading overlay rendered as plain DOM (not drei <Html>), driven by drei's
+ * global progress store. Living outside the Canvas avoids the React 19
+ * unmount race that <Html> triggers when the Suspense fallback tears down.
+ */
+function LoadingOverlay() {
+  const { progress, active } = useProgress();
+  if (!active && progress >= 100) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 grid place-items-center bg-ink-900/60">
+      <div className="flex w-48 flex-col items-center gap-3">
+        <div className="h-px w-full bg-steel-700">
+          <div
+            className="h-px bg-accent-bright transition-all duration-200"
+            style={{ width: `${Math.max(5, progress)}%` }}
+          />
+        </div>
+        <span className="font-mono text-[11px] uppercase tracking-label text-steel-300">
+          Loading model · {Math.round(progress)}%
+        </span>
+      </div>
+    </div>
+  );
+}
 
 // ── Error boundary so a broken model never crashes the page ────────────────
 class ViewerErrorBoundary extends Component<
@@ -127,6 +153,7 @@ export function ModelViewer({
           <Suspense fallback={<ViewerSkeleton />}>
             <ModelScene url={url} resetSignal={resetSignal} explode={explode} />
           </Suspense>
+          <LoadingOverlay />
         </ViewerErrorBoundary>
       )}
 
