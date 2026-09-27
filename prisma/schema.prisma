@@ -1,0 +1,161 @@
+// Jay Engineering Portfolio — content model.
+//
+// Content is fully separated from UI. Every project is a database record,
+// never a hardcoded component. The schema is intentionally normalized so new
+// fields (scalar columns) and new asset/section types (rows) can be added
+// later without rewriting the application.
+//
+// PostgreSQL is the datasource (works locally and on serverless hosts like
+// Vercel). Point DATABASE_URL at any Postgres instance — a free hosted one
+// (Neon, Supabase, Vercel Postgres) works for both local dev and production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Admins ─────────────────────────────────────────────────────────────
+// Multi-admin ready from day one: authentication is per-user, so additional
+// administrators can be added later without schema changes.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("admin") // "admin" | (future: "editor", etc.)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── Categories ─────────────────────────────────────────────────────────
+// Managed through the admin system, never permanently hardcoded.
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  projects  Project[]
+}
+
+// ─── Projects ───────────────────────────────────────────────────────────
+enum ProjectStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model Project {
+  id               String   @id @default(cuid())
+  title            String
+  slug             String   @unique
+  shortDescription String   @default("")
+  description      String   @default("") // long-form intro / body
+
+  // Relations
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // Free-form technical metadata. Stored as JSON-encoded arrays/strings so the
+  // set of fields can grow without migrations. Only populated fields are shown
+  // publicly — nothing is ever invented.
+  tags       String @default("[]") // JSON string[]
+  software   String @default("[]") // JSON string[]
+  materials  String @default("[]") // JSON string[]
+  components String @default("[]") // JSON string[]
+  tools      String @default("[]") // JSON string[]
+
+  year        String @default("")
+  role        String @default("")
+  dimensions  String @default("")
+  projectType String @default("")
+
+  // Publication / curation
+  status    ProjectStatus @default(DRAFT)
+  featured  Boolean       @default(false)
+
+  // Primary cover image asset (denormalized pointer for fast list rendering)
+  coverImageId String?
+  coverImage   MediaAsset? @relation("ProjectCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+
+  // All attached assets (models, gallery, drawings, files, videos)
+  assets       MediaAsset[]        @relation("ProjectAssets")
+  caseStudy    CaseStudySection[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([featured])
+  @@index([categoryId])
+}
+
+// ─── Case study sections ────────────────────────────────────────────────
+// A flexible, ordered list of content blocks (Overview, Design Challenge,
+// Design Approach, etc.). New section kinds require no schema change — the
+// `kind` is just a label chosen in the admin UI.
+model CaseStudySection {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  heading String
+  body    String  @default("")
+  order   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+// ─── Media assets ─────────────────────────────────────────────────────────
+// A single table for every uploaded asset. `kind` distinguishes primary
+// models, alternative/exploded models, gallery images, drawings, PDFs and
+// videos. The physical bytes live in object storage, never in the source
+// tree — only the storage key + public URL are recorded here.
+enum AssetKind {
+  MODEL_PRIMARY
+  MODEL_ALTERNATIVE
+  MODEL_EXPLODED
+  MODEL_ADDITIONAL
+  GALLERY_IMAGE
+  DRAWING
+  DOCUMENT
+  VIDEO
+  COVER_IMAGE
+}
+
+model MediaAsset {
+  id        String    @id @default(cuid())
+  kind      AssetKind
+
+  // Human label shown in admin/gallery captions (optional).
+  label     String    @default("")
+
+  // Storage abstraction: `storageKey` is provider-agnostic; `url` is the
+  // resolved public URL. Swapping providers only changes how these are set.
+  storageKey String
+  url        String
+  mimeType   String   @default("")
+  sizeBytes  Int      @default(0)
+
+  order     Int       @default(0)
+
+  // Owning project (nullable so an asset can exist briefly before attach).
+  projectId String?
+  project   Project?  @relation("ProjectAssets", fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Back-relation for cover image pointer.
+  coverOf   Project[] @relation("ProjectCover")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([kind])
+}

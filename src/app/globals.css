@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-ink text-paper font-sans antialiased;
+  }
+
+  ::selection {
+    background: theme("colors.accent.DEFAULT");
+    color: white;
+  }
+
+  /* Restrained, technical scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: theme("colors.ink.900");
+  }
+  ::-webkit-scrollbar-thumb {
+    background: theme("colors.steel.700");
+    border-radius: 0;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: theme("colors.steel.600");
+  }
+}
+
+@layer components {
+  /* Compact technical label — small caps, wide tracking, mono. */
+  .tech-label {
+    @apply font-mono text-[11px] uppercase tracking-label text-steel-400;
+  }
+
+  /* Thin blueprint hairline used to separate technical blocks. */
+  .hairline {
+    @apply border-t border-steel-800;
+  }
+
+  /* Subtle blueprint grid backdrop. */
+  .blueprint-grid {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .content-wrap {
+    @apply mx-auto w-full max-w-content px-6 md:px-10;
+  }
+
+  /* Technical range slider (used by the exploded-view control). */
+  input[type="range"] {
+    @apply h-1 appearance-none rounded-none bg-steel-700;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 14px;
+    width: 14px;
+    background: theme("colors.accent.bright");
+    border: 1px solid theme("colors.paper.DEFAULT");
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    height: 14px;
+    width: 14px;
+    background: theme("colors.accent.bright");
+    border: 1px solid theme("colors.paper.DEFAULT");
+    border-radius: 0;
+    cursor: pointer;
+  }
+}
