@@ -3,7 +3,12 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { uploadAsset, deleteAsset, updateAssetRotation } from "@/lib/actions/assets";
+import {
+  createUploadTarget,
+  registerAsset,
+  deleteAsset,
+  updateAssetRotation,
+} from "@/lib/actions/assets";
 import { formatBytes } from "@/lib/utils";
 import type { Asset } from "@/lib/types";
 import type { AssetKind } from "@prisma/client";
@@ -70,6 +75,57 @@ const SLOTS: SlotConfig[] = [
   },
 ];
 
+/**
+ * Uploads one file DIRECTLY to object storage via a presigned URL, bypassing
+ * the serverless request-body limit, then registers its metadata. Returns an
+ * error message string on failure, or null on success.
+ */
+async function uploadOneDirect(
+  projectId: string,
+  kind: AssetKind,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<string | null> {
+  // 1) Ask the server for a presigned upload target.
+  const target = await createUploadTarget(projectId, kind, file.name, file.type);
+  if (!target.ok || !target.uploadUrl || !target.key || !target.publicUrl) {
+    return target.error ?? "Could not start upload";
+  }
+
+  // 2) PUT the bytes straight to storage with progress.
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", target.uploadUrl!);
+      for (const [h, v] of Object.entries(target.headers ?? {})) {
+        xhr.setRequestHeader(h, v);
+      }
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () =>
+        xhr.status >= 200 && xhr.status < 300
+          ? resolve()
+          : reject(new Error(`Upload failed (${xhr.status})`));
+      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.send(file);
+    });
+  } catch (e) {
+    return e instanceof Error ? e.message : "Upload failed";
+  }
+
+  // 3) Record the asset in the database.
+  const res = await registerAsset({
+    projectId,
+    kind,
+    key: target.key,
+    url: target.publicUrl,
+    mimeType: file.type || "application/octet-stream",
+    sizeBytes: file.size,
+  });
+  return res.ok ? null : res.error ?? "Could not save asset";
+}
+
 export function AssetManager({
   projectId,
   assets,
@@ -119,30 +175,45 @@ function AssetSlot({
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const onFiles = (files: FileList | null) => {
+  const onFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setError(null);
-    startTransition(async () => {
-      for (const file of Array.from(files)) {
-        const res = await uploadAsset(projectId, slot.kind, file);
-        if (!res.ok) {
-          setError(res.error ?? "Upload failed");
+    setPending(true);
+    try {
+      const list = Array.from(files);
+      for (let i = 0; i < list.length; i++) {
+        const file = list[i];
+        const err = await uploadOneDirect(
+          projectId,
+          slot.kind,
+          file,
+          (pct) => setProgress(pct),
+        );
+        if (err) {
+          setError(err);
           break;
         }
       }
+    } finally {
+      setPending(false);
+      setProgress(null);
       if (inputRef.current) inputRef.current.value = "";
       router.refresh();
-    });
+    }
   };
 
-  const onDelete = (id: string) => {
-    startTransition(async () => {
+  const onDelete = async (id: string) => {
+    setPending(true);
+    try {
       await deleteAsset(id);
+    } finally {
+      setPending(false);
       router.refresh();
-    });
+    }
   };
 
   return (
@@ -167,7 +238,11 @@ function AssetSlot({
             onClick={() => inputRef.current?.click()}
             className="border border-steel-600 px-3 py-1.5 font-mono text-[10px] uppercase tracking-label text-paper hover:bg-ink-700 disabled:opacity-50"
           >
-            {pending ? "Uploading…" : "Upload"}
+            {pending
+              ? progress !== null
+                ? `Uploading ${progress}%`
+                : "Uploading…"
+              : "Upload"}
           </button>
         </div>
       </div>

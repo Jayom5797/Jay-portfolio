@@ -1,6 +1,11 @@
 import crypto from "node:crypto";
 import { env } from "../env";
-import type { PutObjectInput, StorageProvider, StoredObject } from "./provider";
+import type {
+  PutObjectInput,
+  StorageProvider,
+  StoredObject,
+  UploadTarget,
+} from "./provider";
 
 /**
  * S3-compatible storage provider (AWS S3, Cloudflare R2, MinIO, Backblaze B2,
@@ -36,6 +41,76 @@ export class S3StorageProvider implements StorageProvider {
 
   async delete(key: string): Promise<void> {
     await this.signedRequest("DELETE", key, Buffer.alloc(0), "");
+  }
+
+  /**
+   * Presigned PUT URL (SigV4, query-string style, UNSIGNED-PAYLOAD) so the
+   * browser can upload the file directly to S3 without the bytes passing
+   * through the app server. Valid for 1 hour.
+   */
+  async createUploadTarget(key: string, mimeType: string): Promise<UploadTarget> {
+    const url = new URL(this.objectUrl(key));
+    const now = new Date();
+    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+    const dateStamp = amzDate.slice(0, 8);
+    const service = "s3";
+    const region = this.cfg.region;
+    const scope = `${dateStamp}/${region}/${service}/aws4_request`;
+
+    // The browser will send Content-Type; sign only host so the preflight and
+    // simple PUT both work across S3-compatible providers.
+    const signedHeaders = "host";
+    const canonicalHeaders = `host:${url.host}\n`;
+
+    const query: Record<string, string> = {
+      "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+      "X-Amz-Credential": `${this.cfg.accessKeyId}/${scope}`,
+      "X-Amz-Date": amzDate,
+      "X-Amz-Expires": "3600",
+      "X-Amz-SignedHeaders": signedHeaders,
+    };
+    const canonicalQuery = Object.keys(query)
+      .sort()
+      .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(query[k])}`)
+      .join("&");
+
+    const canonicalRequest = [
+      "PUT",
+      url.pathname,
+      canonicalQuery,
+      canonicalHeaders,
+      signedHeaders,
+      "UNSIGNED-PAYLOAD",
+    ].join("\n");
+
+    const stringToSign = [
+      "AWS4-HMAC-SHA256",
+      amzDate,
+      scope,
+      crypto.createHash("sha256").update(canonicalRequest).digest("hex"),
+    ].join("\n");
+
+    const hmac = (k: crypto.BinaryLike, d: string) =>
+      crypto.createHmac("sha256", k).update(d).digest();
+    const kDate = hmac(`AWS4${this.cfg.secretAccessKey}`, dateStamp);
+    const kRegion = hmac(kDate, region);
+    const kService = hmac(kRegion, service);
+    const kSigning = hmac(kService, "aws4_request");
+    const signature = crypto
+      .createHmac("sha256", kSigning)
+      .update(stringToSign)
+      .digest("hex");
+
+    const uploadUrl = `${url.toString()}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+
+    return {
+      uploadUrl,
+      method: "PUT",
+      // Content-Type is optional for the browser to send; S3 stores it if sent.
+      headers: mimeType ? { "Content-Type": mimeType } : {},
+      key,
+      publicUrl: this.publicUrl(key),
+    };
   }
 
   // ── AWS SigV4 signing ───────────────────────────────────────────────────

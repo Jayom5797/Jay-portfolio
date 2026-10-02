@@ -13,6 +13,16 @@ export interface UploadResult {
   url?: string;
 }
 
+export interface UploadTargetResult {
+  ok: boolean;
+  error?: string;
+  uploadUrl?: string;
+  method?: "PUT";
+  headers?: Record<string, string>;
+  key?: string;
+  publicUrl?: string;
+}
+
 const KIND_ACCEPT: Record<AssetKind, string[]> = {
   MODEL_PRIMARY: [".glb", ".gltf"],
   MODEL_ALTERNATIVE: [".glb", ".gltf"],
@@ -100,6 +110,90 @@ export async function uploadAssetForm(projectId: string, formData: FormData): Pr
   if (file instanceof File) {
     await uploadAsset(projectId, kind, file, label);
   }
+}
+
+/**
+ * Step 1 of a direct (presigned) upload. Validates auth + file type and
+ * returns a target the BROWSER uploads the bytes to directly — bypassing the
+ * serverless 4.5 MB request-body limit so large GLBs upload fine on Vercel.
+ */
+export async function createUploadTarget(
+  projectId: string,
+  kind: AssetKind,
+  fileName: string,
+  mimeType: string,
+): Promise<UploadTargetResult> {
+  await requireUser();
+
+  const project = await db.project.findUnique({ where: { id: projectId } });
+  if (!project) return { ok: false, error: "Project not found" };
+
+  const ext = extOf(fileName);
+  const allowed = KIND_ACCEPT[kind];
+  if (allowed && ext && !allowed.includes(ext)) {
+    return { ok: false, error: `Unsupported file type for this slot (${ext}).` };
+  }
+
+  const storage = getStorage();
+  const key = buildAssetKey(project.slug, fileName);
+  const target = await storage.createUploadTarget(key, mimeType);
+
+  return {
+    ok: true,
+    uploadUrl: target.uploadUrl,
+    method: target.method,
+    headers: target.headers,
+    key: target.key,
+    publicUrl: target.publicUrl,
+  };
+}
+
+/**
+ * Step 2 of a direct upload. After the browser has PUT the bytes to storage,
+ * record the asset metadata (and set the cover pointer for cover images).
+ */
+export async function registerAsset(input: {
+  projectId: string;
+  kind: AssetKind;
+  key: string;
+  url: string;
+  mimeType: string;
+  sizeBytes: number;
+  label?: string;
+}): Promise<UploadResult> {
+  await requireUser();
+
+  const project = await db.project.findUnique({ where: { id: input.projectId } });
+  if (!project) return { ok: false, error: "Project not found" };
+
+  const count = await db.mediaAsset.count({
+    where: { projectId: input.projectId, kind: input.kind },
+  });
+
+  const asset = await db.mediaAsset.create({
+    data: {
+      kind: input.kind,
+      label: input.label ?? "",
+      storageKey: input.key,
+      url: input.url,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      order: count,
+      projectId: input.projectId,
+    },
+  });
+
+  if (input.kind === "COVER_IMAGE") {
+    await db.project.update({
+      where: { id: input.projectId },
+      data: { coverImageId: asset.id },
+    });
+  }
+
+  revalidatePath(`/admin/projects/${input.projectId}`);
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${project.slug}`);
+  return { ok: true, assetId: asset.id, url: input.url };
 }
 
 export async function deleteAsset(assetId: string): Promise<UploadResult> {

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getStorage, LocalStorageProvider } from "@/lib/storage";
+import { getSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -54,4 +55,29 @@ export async function GET(
   } catch {
     return new Response("Asset not found", { status: 404 });
   }
+}
+
+/**
+ * Direct upload target for the LOCAL storage provider (dev). Authenticated —
+ * only an admin session may write. On S3, the browser PUTs to a presigned S3
+ * URL instead and this handler is unused.
+ */
+export async function PUT(
+  req: NextRequest,
+  ctx: { params: Promise<{ key: string[] }> },
+) {
+  const user = await getSessionUser();
+  if (!user) return new Response("Unauthorized", { status: 401 });
+
+  const storage = getStorage();
+  if (!(storage instanceof LocalStorageProvider)) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const { key: parts } = await ctx.params;
+  const key = parts.map((p) => decodeURIComponent(p)).join("/");
+
+  const arrayBuffer = await req.arrayBuffer();
+  await storage.write(key, Buffer.from(arrayBuffer));
+  return new Response(null, { status: 200 });
 }

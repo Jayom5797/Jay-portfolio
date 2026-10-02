@@ -1,7 +1,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { env } from "../env";
-import type { PutObjectInput, StorageProvider, StoredObject } from "./provider";
+import type {
+  PutObjectInput,
+  StorageProvider,
+  StoredObject,
+  UploadTarget,
+} from "./provider";
 
 /**
  * Local-disk storage provider.
@@ -59,8 +64,31 @@ export class LocalStorageProvider implements StorageProvider {
     return `/api/assets/${safeKey}`;
   }
 
+  /**
+   * For local dev the browser PUTs directly to the asset route, which writes
+   * to disk. (On a single Node server there's no serverless body limit, so
+   * this keeps the same direct-upload flow working everywhere.)
+   */
+  async createUploadTarget(key: string, mimeType: string): Promise<UploadTarget> {
+    const safeKey = key.replace(/\\/g, "/").replace(/^\/+/, "");
+    return {
+      uploadUrl: `/api/assets/${safeKey}`,
+      method: "PUT",
+      headers: mimeType ? { "Content-Type": mimeType } : {},
+      key,
+      publicUrl: this.publicUrl(key),
+    };
+  }
+
   /** Used by the asset-serving route to read bytes back. */
   async read(key: string): Promise<Buffer> {
     return fs.readFile(this.resolvePath(key));
+  }
+
+  /** Used by the asset route to accept a direct PUT upload (local dev). */
+  async write(key: string, data: Buffer): Promise<void> {
+    const full = this.resolvePath(key);
+    await fs.mkdir(path.dirname(full), { recursive: true });
+    await fs.writeFile(full, data);
   }
 }

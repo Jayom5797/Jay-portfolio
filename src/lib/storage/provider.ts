@@ -23,6 +23,19 @@ export interface PutObjectInput {
   mimeType: string;
 }
 
+export interface UploadTarget {
+  /** URL the browser PUTs the file bytes to directly. */
+  uploadUrl: string;
+  /** HTTP method for the upload (always PUT here). */
+  method: "PUT";
+  /** Headers the browser must send with the PUT. */
+  headers: Record<string, string>;
+  /** Provider-agnostic storage key the object will live under. */
+  key: string;
+  /** Public URL the object will be readable from after upload. */
+  publicUrl: string;
+}
+
 export interface StorageProvider {
   readonly name: string;
   /** Store bytes under `key`, returning its public URL + metadata. */
@@ -31,4 +44,10 @@ export interface StorageProvider {
   delete(key: string): Promise<void>;
   /** Resolve the public URL for an existing key. */
   publicUrl(key: string): string;
+  /**
+   * Create a target the browser can upload a file to DIRECTLY, bypassing the
+   * app server. This is how large files (big GLBs) are uploaded on serverless
+   * hosts like Vercel, which cap request bodies at ~4.5 MB.
+   */
+  createUploadTarget(key: string, mimeType: string): Promise<UploadTarget>;
 }
